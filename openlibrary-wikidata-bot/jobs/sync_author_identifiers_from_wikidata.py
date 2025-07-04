@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import datetime
+from typing import Any
 from olclient import OpenLibrary
 from os import makedirs
 import argparse
@@ -21,12 +22,12 @@ console_handler.setLevel(logging.WARN)
 console_handler.setFormatter(log_formatter)
 logger.addHandler(console_handler)
 # Log INFO+ to the log file
-log_dir = "logs/jobs/sync_author_wikidata_ids"
+log_dir = "logs/jobs/sync_author_identifiers_from_wikidata"
 makedirs(log_dir, exist_ok=True)
 log_file_datetime = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-log_file = log_dir + "/sync_author_wikidata_ids_%s.log" % log_file_datetime
+log_file = log_dir + "/sync_author_identifiers_from_wikidata_%s.log" % log_file_datetime
 problems_file = (
-    log_dir + "/sync_author_wikidata_ids_%s_problems.csv" % log_file_datetime
+    log_dir + "/sync_author_identifiers_from_wikidata_%s_problems.csv" % log_file_datetime
 )
 file_handler = logging.FileHandler(log_file)
 file_handler.setLevel(logging.DEBUG)
@@ -62,7 +63,7 @@ WD_PID_TO_OL_IDENTIFIER_NAME = {
 }
 
 
-def validate_wikidata_key(obj: dict[str, any], key=str) -> bool:
+def validate_wikidata_key(obj: dict[str, Any], key: str) -> bool:
     if not ("property" in obj):
         return False
     if not ("id" in obj["property"]):
@@ -110,8 +111,8 @@ def merge_remote_ids(author, incoming_ids, wd_id) -> tuple[dict[str, str], int]:
         elif identifier in incoming_ids and identifier not in output:
             output[identifier] = incoming_ids[identifier]
     if conflicts > 0:
-        return author.remote_ids, -1
-    return output
+        return author.remote_ids, conflicts
+    return output, conflicts
 
 
 def consolidate_remote_author_ids(sql_path: str, dry_run: bool = True) -> None:
@@ -206,8 +207,8 @@ def consolidate_remote_author_ids(sql_path: str, dry_run: bool = True) -> None:
                         json.dumps(valid_wd_remote_id_values),
                     )
 
-            remote_ids = merge_remote_ids(author, remote_ids, wd_id)
-            if not dry_run:
+            remote_ids, conflicts = merge_remote_ids(author, remote_ids, wd_id)
+            if not dry_run and not conflicts:
                 author.remote_ids = remote_ids
                 author.save(
                     "[sync_author_identifiers_with_wikidata] add wikidata remote identifiers"
