@@ -168,9 +168,13 @@ def consolidate_remote_author_ids(sql_path: str, dry_run: bool = True) -> None:
                         json.dumps(ol_ids),
                     )
                 continue
-            ol_id = ol_ids[0]
+                
+            authors = [ol.Author.get(ol_id) for ol_id in ol_ids]
+            author = next((a for a in authors if a.type.key == "/type/author"), None)
 
-            author = ol.Author.get(ol_id)
+            # all results are redirects or no authors found: don't change anything
+            if author is None:
+                continue
 
             remote_ids = {"wikidata": wd_id}
 
