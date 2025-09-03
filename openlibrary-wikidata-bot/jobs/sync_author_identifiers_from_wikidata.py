@@ -156,25 +156,40 @@ def consolidate_remote_author_ids(sql_path: str, dry_run: bool = True) -> None:
                 continue
             wd_id = parsed_wikidata_json["id"]
 
-            if len(ol_ids) > 1:
-                for ol_id in ol_ids:
-                    author = ol.Author.get(ol_id)
+            base_authors = [ol.Author.get(ol_id) for ol_id in ol_ids]
+            redirected_authors = [
+                ol.Author.get(a.location.split("/authors/")[-1])
+                for a in base_authors
+                if a.type.get("key") == "/type/redirect"
+                and getattr(a, "location", None)
+                and a.location.startswith("/authors/")
+            ]
+            nonredirected_authors = [a for a in base_authors if a.type.get("key") == "/type/author"]
+
+            concat_authors = redirected_authors + nonredirected_authors
+            authors = list({a.olid: a for a in concat_authors}.values()) # unique
+
+            # all results are redirects or no authors found: don't change anything
+            if len(authors) == 0:
+                continue
+
+            # PROBLEM: need recursive processing, redirects can be nested
+            # do some kind of recursive that aborts if it sees the same id twice
+
+            if len(authors) > 1:
+                for author in authors:
                     write_error(
                         wd_id,
-                        ol_id,
+                        author.olid,
                         author.name,
                         "multiple_openlibrary_authors_for_one_wikidata_row",
                         "ol_id",
-                        json.dumps(ol_ids),
+                        json.dumps([author.olid for author in authors]),
                     )
                 continue
-                
-            authors = [ol.Author.get(ol_id) for ol_id in ol_ids]
-            author = next((a for a in authors if a.type.key == "/type/author"), None)
 
-            # all results are redirects or no authors found: don't change anything
-            if author is None:
-                continue
+            # proceed with the first author in the array by default. we've logged extras to investigate later
+            author = authors[0]
 
             remote_ids = {"wikidata": wd_id}
 
@@ -204,7 +219,7 @@ def consolidate_remote_author_ids(sql_path: str, dry_run: bool = True) -> None:
                 else:
                     write_error(
                         wd_id,
-                        ol_id,
+                        author.olid,
                         author.name,
                         "multiple_wikidata_remote_ids_for_one_author",
                         ol_identifier_name,
@@ -214,10 +229,10 @@ def consolidate_remote_author_ids(sql_path: str, dry_run: bool = True) -> None:
             remote_ids, conflicts = merge_remote_ids(author, remote_ids, wd_id)
             if not dry_run and not conflicts:
                 author.remote_ids = remote_ids
-                author.save(
-                    "[sync_author_identifiers_with_wikidata] add wikidata remote identifiers"
-                )
-            logger.info(f"new remote_ids for {ol_id}: {remote_ids}")
+                # author.save(
+                #     "[sync_author_identifiers_with_wikidata] add wikidata remote identifiers"
+                # )
+            logger.info(f"new remote_ids for {author.olid}: {remote_ids}")
 
 
 if __name__ == "__main__":
