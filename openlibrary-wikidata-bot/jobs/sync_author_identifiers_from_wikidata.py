@@ -115,8 +115,25 @@ def merge_remote_ids(author, incoming_ids, wd_id) -> tuple[dict[str, str], int]:
     return output, conflicts
 
 
+
+
 def consolidate_remote_author_ids(sql_path: str, dry_run: bool = True) -> None:
     ol = OpenLibrary()
+    
+    def resolve_redirects(author, seen=None):
+        if seen is None:
+            seen = set()
+        key = author.olid
+        if not key or key in seen:
+            return []
+        seen.add(key)
+        if author.type.get("key") != "/type/redirect":
+            return [author]
+        location = author.location
+        if location and location.startswith("/authors/"):
+            redirected_author = ol.Author.get(location.split("/authors/")[-1])
+            return resolve_redirects(redirected_author, seen)
+        return []
 
     csv.field_size_limit(sys.maxsize)
 
@@ -157,13 +174,10 @@ def consolidate_remote_author_ids(sql_path: str, dry_run: bool = True) -> None:
             wd_id = parsed_wikidata_json["id"]
 
             base_authors = [ol.Author.get(ol_id) for ol_id in ol_ids]
-            redirected_authors = [
-                ol.Author.get(a.location.split("/authors/")[-1])
-                for a in base_authors
-                if a.type.get("key") == "/type/redirect"
-                and getattr(a, "location", None)
-                and a.location.startswith("/authors/")
-            ]
+
+            redirected_authors = []
+            for a in base_authors:
+                redirected_authors.extend(resolve_redirects(a))
             nonredirected_authors = [a for a in base_authors if a.type.get("key") == "/type/author"]
 
             concat_authors = redirected_authors + nonredirected_authors
