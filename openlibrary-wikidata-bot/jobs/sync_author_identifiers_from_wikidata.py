@@ -229,9 +229,9 @@ def consolidate_remote_author_ids(sql_path: str, dry_run: bool = True) -> None:
             remote_ids, conflicts = merge_remote_ids(author, remote_ids, wd_id)
             if not dry_run and not conflicts:
                 author.remote_ids = remote_ids
-                # author.save(
-                #     "[sync_author_identifiers_with_wikidata] add wikidata remote identifiers"
-                # )
+                author.save(
+                    "[sync_author_identifiers_with_wikidata] add wikidata remote identifiers"
+                )
             logger.info(f"new remote_ids for {author.olid}: {remote_ids}")
 
 
