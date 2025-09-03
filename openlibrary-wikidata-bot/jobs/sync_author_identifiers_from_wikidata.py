@@ -115,8 +115,6 @@ def merge_remote_ids(author, incoming_ids, wd_id) -> tuple[dict[str, str], int]:
     return output, conflicts
 
 
-
-
 def consolidate_remote_author_ids(sql_path: str, dry_run: bool = True) -> None:
     ol = OpenLibrary()
     
@@ -186,9 +184,6 @@ def consolidate_remote_author_ids(sql_path: str, dry_run: bool = True) -> None:
             # all results are redirects or no authors found: don't change anything
             if len(authors) == 0:
                 continue
-
-            # PROBLEM: need recursive processing, redirects can be nested
-            # do some kind of recursive that aborts if it sees the same id twice
 
             if len(authors) > 1:
                 for author in authors:
