@@ -118,6 +118,7 @@ def merge_remote_ids(author, incoming_ids, wd_id) -> tuple[dict[str, str], int]:
 def consolidate_remote_author_ids(sql_path: str, dry_run: bool = True) -> None:
     ol = OpenLibrary()
     
+    # Follow author redirects until it either hits an object of /type/author or is determined to be an infinite loop redirect.
     def resolve_redirects(author, seen=None):
         if seen is None:
             seen = set()
